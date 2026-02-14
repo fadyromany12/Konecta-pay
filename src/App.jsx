@@ -385,7 +385,7 @@ const PayslipDocument = ({ employee, columns, period, standardDays, className = 
                     <div className="text-xs text-slate-600 space-y-0.5">
                         {ot135 > 0 && <div className="flex justify-between"><span>Day (1.35x)</span><span>{ot135}h</span></div>}
                         {ot17 > 0 && <div className="flex justify-between"><span>Night (1.7x)</span><span>{ot17}h</span></div>}
-                        {phHours > 0 && <div className="flex justify-between"><span>Public (2x)</span><span>{phHours}h</span></div>}
+                        {phHours > 0 && <div className="flex justify-between"><span>PH (2x)</span><span>{phHours}h</span></div>}
                     </div>
                     <div className="mt-2 pt-2 border-t border-blue-100 font-bold text-blue-700 text-right">
                         {otValue.toLocaleString()} {employee.currency || 'EGP'}
@@ -744,7 +744,7 @@ export default function App() {
 
   // --- NEW: Smart Template Download ---
   const handleDownloadTemplate = () => {
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Holiday (2x)'];
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
     
     const exampleDeductions = ['(Ded) Medical Insurance', '(Ded) Social Security'];
     const financialHeaders = [...columns.map(c => c.key !== 'overtime' ? `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}` : '').filter(Boolean), ...exampleDeductions];
@@ -829,7 +829,7 @@ export default function App() {
   const handleExportCSV = () => {
     if (employees.length === 0) return;
     
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Holiday'];
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Public Holiday'];
     const financialHeaders = columns.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
     const headers = [...standardHeaders, ...financialHeaders, 'Net Pay'];
 
@@ -1427,7 +1427,7 @@ export default function App() {
                                  className="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                />
                              </td>
-                             {/* Holiday 1.7x (replaces old 2.0 column display but uses 1.7 factor) */}
+                             {/* Public Holiday 2x */}
                              <td className={`px-2 py-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
                                <input 
                                  type="number" 
