@@ -51,7 +51,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONFIGURATION ---
-// ⬇️ ADD MANAGER EMAILS HERE ⬇️
 const ADMIN_EMAILS = [
   "admin@konecta.com", 
   "finance@konecta.com",
@@ -69,13 +68,6 @@ const MANDATORY_FIELDS = ['basic', 'social_ins', 'income_tax'];
 const PRESET_COLUMNS = {
   entitlements: ["Transportation", "Meal Allowance", "Shift Allowance", "KPI Bonus"],
   deductions: ["Medical Insurance", "Social Security", "Absenteeism", "Loan Repayment", "Lateness Penalty", "Income Tax"]
-};
-
-// Updated Overtime Rates
-const OVERTIME_RATES = {
-  day: 1.35,      // Day Shift
-  night: 1.7,     // Night Shift
-  holiday: 2    // Public Holiday (Same as Night per request)
 };
 
 // --- LOGIC: Tax Calculator ---
@@ -124,9 +116,9 @@ const calculateOvertimeValue = (basicSalary, hours, rate, divisor = 240) => {
 
 // --- LOGIC: Mock Data ---
 const generateMockData = () => [
-  { id: 'eg5441', name: 'Sarah Ahmed', role: 'CSR', email: 'sarah.ahmed@konecta.com', project: 'Vodafone UK', basic: 4500, bonus: 500, ot_135: 2, ot_17: 0, ph_hours: 0, overtime: 265, bank_name: 'CIB', iban: 'EG1200000000001234567890', currency: 'EGP', worked_days: 30 },
-  { id: 'eg5442', name: 'Mohamed Ali', role: 'Team Leader', email: 'mohamed.ali@konecta.com', project: 'Orange Business', basic: 7200, bonus: 1200, ot_135: 0, ot_17: 8, ph_hours: 8, overtime: 1250, bank_name: 'QNB Alahli', iban: 'EG9800000000009876543210', currency: 'EGP', worked_days: 30 },
-  { id: 'eg5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 5800, bonus: 300, ot_135: 0, ot_17: 0, ph_hours: 0, overtime: 105, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 30 },
+  { id: 'EG5441', name: 'Sarah Ahmed', role: 'CSR', email: 'sarah.ahmed@konecta.com', project: 'Vodafone UK', basic: 10000, bonus: 500, ot_135: 2, ot_17: 0, ph_hours: 0, overtime: 265, bank_name: 'CIB', iban: 'EG1200000000001234567890', currency: 'EGP', worked_days: 30 },
+  { id: 'EG5442', name: 'Mohamed Ali', role: 'Team Leader', email: 'mohamed.ali@konecta.com', project: 'Orange Business', basic: 15000, bonus: 1200, ot_135: 0, ot_17: 8, ph_hours: 8, overtime: 1250, bank_name: 'QNB Alahli', iban: 'EG9800000000009876543210', currency: 'EGP', worked_days: 30 },
+  { id: 'EG5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 12000, bonus: 300, ot_135: 0, ot_17: 0, ph_hours: 0, overtime: 105, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 25 }, // Prorated example
 ];
 
 // --- COMPONENTS ---
@@ -165,7 +157,6 @@ const LoginScreen = ({ onLogin }) => {
     setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Check if email is in the admin list
       const role = ADMIN_EMAILS.includes(email.toLowerCase()) ? 'admin' : 'employee';
       onLogin(userCredential.user, role);
     } catch (err) {
@@ -322,16 +313,6 @@ const ProrationModal = ({ isOpen, onClose, onApply, employees, columns, standard
            </div>
         </div>
 
-        <label className="block text-sm font-bold text-slate-700 mb-2">Apply Proration To:</label>
-        <div className="grid grid-cols-2 gap-2 mb-6 max-h-40 overflow-y-auto border p-2 rounded-lg border-slate-100">
-          {entitlements.map(col => (
-            <label key={col.key} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-              <input type="checkbox" checked={selectedCols.includes(col.key)} onChange={() => toggleCol(col.key)} className="rounded text-blue-600 focus:ring-blue-500" />
-              {col.label}
-            </label>
-          ))}
-        </div>
-
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
           <Button onClick={handleApply} className="flex-1">Apply Proration</Button>
@@ -425,7 +406,7 @@ const PayslipDocument = ({ employee, columns, period, standardDays, className = 
                 {entitlementCols.map(col => (
                   <tr key={col.key}>
                     <td className="py-2.5 text-slate-600">{col.label}</td>
-                    <td className="py-2.5 text-right font-medium text-slate-800">{(employee[col.key] || 0).toLocaleString()}</td>
+                    <td className="py-2.5 text-right font-medium text-green-700">+ {(employee[col.key] || 0).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -442,7 +423,7 @@ const PayslipDocument = ({ employee, columns, period, standardDays, className = 
                 {deductionCols.map(col => (
                   <tr key={col.key}>
                     <td className="py-2.5 text-slate-600">{col.label}</td>
-                    <td className="py-2.5 text-right font-medium text-slate-800">{(employee[col.key] || 0).toLocaleString()}</td>
+                    <td className="py-2.5 text-right font-medium text-red-600">- {(employee[col.key] || 0).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -653,23 +634,17 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   // --- SYNC WITH FIRESTORE ---
   useEffect(() => {
-    // 1. Sync Employees
     const unsubEmp = onSnapshot(collection(db, 'employees'), (snap) => {
       const data = snap.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id }));
       setMasterDB(data);
     });
-
-    // 2. Sync Audit Logs
     const unsubLogs = onSnapshot(query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc')), (snap) => {
       setAuditLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
-    // 3. Sync History (from payroll_runs collection)
     const unsubHist = onSnapshot(query(collection(db, 'payroll_runs'), orderBy('date', 'desc')), (snap) => {
       setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Load Local Configs
     const savedConfig = localStorage.getItem('konecta_email_config');
     if (savedConfig) setEmailConfig(JSON.parse(savedConfig));
     const savedMsg = localStorage.getItem('konecta_email_message');
@@ -701,7 +676,6 @@ const AdminDashboard = ({ user, onLogout }) => {
     const batch = writeBatch(db);
     let count = 0;
     for (const emp of employees) {
-        // Find if exists in masterDB by EGID
         const existing = masterDB.find(m => m.id === emp.id);
         if (existing) {
             const ref = doc(db, 'employees', existing.firebaseId);
@@ -723,7 +697,6 @@ const AdminDashboard = ({ user, onLogout }) => {
     setSendingProgress(0);
 
     const batch = writeBatch(db);
-    
     targetList.forEach((emp) => {
         const docRef = doc(collection(db, "payslips"));
         batch.set(docRef, {
@@ -787,12 +760,11 @@ const AdminDashboard = ({ user, onLogout }) => {
   const handleFileUpload = (event) => {
     setUploading(true);
     const file = event.target.files[0];
-    if (!file) {
-      setUploading(false);
-      return;
-    }
+    if (!file) { setUploading(false); return; }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
+      try {
         const text = e.target.result;
         const lines = text.split(/\r?\n/);
         let headerIndex = -1;
@@ -800,6 +772,7 @@ const AdminDashboard = ({ user, onLogout }) => {
             const line = lines[i].toLowerCase();
             if (line.includes('email') || line.includes('id') || line.includes('egid')) { headerIndex = i; break; }
         }
+        
         if (headerIndex === -1) { 
           showNotification('Invalid CSV Headers', 'error'); 
           setUploading(false);
@@ -856,7 +829,7 @@ const AdminDashboard = ({ user, onLogout }) => {
             const vals = parseLine(lines[i]);
             if (vals.length < 2) continue;
             const emp = { 
-                id: `eg${Math.floor(Math.random()*9000)+1000}`, 
+                id: `EG${Math.floor(Math.random()*9000)+1000}`, 
                 basic: 0, ot_135: 0, ot_17: 0, ph_hours: 0, 
                 bank_name: '', currency: 'EGP', worked_days: standardDays, base_values: {} 
             };
@@ -878,7 +851,16 @@ const AdminDashboard = ({ user, onLogout }) => {
         }
         setEmployees(newEmployees);
         setView('review');
-        setUploading(false); // Stop spinning
+      } catch (err) {
+        console.error(err);
+        showNotification('Error processing CSV', 'error');
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      showNotification('Error reading file', 'error');
+      setUploading(false);
     };
     reader.readAsText(file);
   };
@@ -891,7 +873,11 @@ const AdminDashboard = ({ user, onLogout }) => {
       let updatedEmp = { ...emp };
       if (!updatedEmp.base_values) updatedEmp.base_values = { basic: updatedEmp.basic || 0 };
 
-      if (['name', 'role', 'project', 'id', 'email', 'bank_name', 'iban'].includes(field)) {
+      if (field === 'name') {
+         updatedEmp.name = value;
+         // Auto-generate email format: firstname.lastname@konecta.com
+         updatedEmp.email = value.toLowerCase().trim().replace(/\s+/g, '.') + '@konecta.com';
+      } else if (['role', 'project', 'id', 'email', 'bank_name', 'iban', 'currency'].includes(field)) {
          updatedEmp[field] = value;
       } else if (field === 'worked_days') {
          const newDays = parseFloat(value) || 0;
@@ -907,17 +893,16 @@ const AdminDashboard = ({ user, onLogout }) => {
             calculateOvertimeValue(baseBasic, updatedEmp.ph_hours || 0, 2, currentDivisor);
       } else if (columns.find(c => c.key === field)) {
           updatedEmp[field] = parseFloat(value) || 0;
-          if (field === 'basic') updatedEmp.base_values.basic = updatedEmp.basic; // Simplification
+          if (field === 'basic') updatedEmp.base_values.basic = updatedEmp.basic; 
       }
       return updatedEmp;
     }));
   };
 
   const handleAddEmployee = () => {
-    setEmployees([...employees, { id: `eg${Math.floor(Math.random()*9000)+1000}`, name: 'New Employee', email: 'user@konecta.com', worked_days: payrollSettings.daysPerMonth }]);
+    setEmployees([...employees, { id: `EG${Math.floor(Math.random()*9000)+1000}`, name: 'New Employee', email: 'new.employee@konecta.com', worked_days: payrollSettings.daysPerMonth }]);
   };
 
-  // --- REINSTATED FUNCTIONS ---
   const handleDeleteEmployee = (id) => {
     if (window.confirm('Remove employee?')) {
       setEmployees(employees.filter(e => e.id !== id));
@@ -927,18 +912,13 @@ const AdminDashboard = ({ user, onLogout }) => {
   };
 
   const handleDownloadTemplate = () => {
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
-    const exampleDeductions = ['(Ded) Medical Insurance', '(Ded) Social Security'];
-    const financialHeaders = [...columns.map(c => c.key !== 'overtime' ? `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}` : '').filter(Boolean), ...exampleDeductions];
-    const uniqueHeaders = [...new Set(financialHeaders)];
-    const headerRow = [...standardHeaders, ...uniqueHeaders].join(',');
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
+    const financialHeaders = columns.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
+    const headers = [...standardHeaders, ...financialHeaders];
     
     // Example Data
-    const standardData = ['John Doe', 'john.doe@konecta.com', 'Vodafone UK', 'CSR', 'eg1234', 'CIB', 'EG1200000000001234567890', 'EGP', payrollSettings.daysPerMonth, '2', '5', '8'];
-    const financialData = uniqueHeaders.map(() => '0'); 
-    const dataRow = [...standardData, ...financialData].join(',');
-
-    const csvContent = "data:text/csv;charset=utf-8," + headerRow + "\n" + dataRow;
+    const row = ['John Doe', 'john.doe@konecta.com', 'Vodafone', 'CSR', 'EG1234', 'CIB', 'EG1234567890123456789012', 'EGP', payrollSettings.daysPerMonth, '2', '5', '8', ...columns.map(()=>'0')];
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), row.join(',')].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -1045,7 +1025,7 @@ const AdminDashboard = ({ user, onLogout }) => {
       </select>
       <div className="w-px h-4 bg-slate-200"></div>
       <select value={payrollPeriod.year} onChange={(e) => setPayrollPeriod({...payrollPeriod, year: parseInt(e.target.value)})} className="bg-transparent text-sm font-medium text-slate-700 focus:outline-none cursor-pointer">
-        {[0,1,2].map(i => <option key={i} value={2024+i}>{2024+i}</option>)}
+        {[0,1,2].map(i => <option key={i} value={2026+i}>{2026+i}</option>)}
       </select>
     </div>
   );
@@ -1212,41 +1192,66 @@ const AdminDashboard = ({ user, onLogout }) => {
                          <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 font-bold uppercase text-xs">
                             <tr>
                                <th className="px-6 py-4 w-12 bg-slate-50"><input type="checkbox" onChange={handleSelectAll} checked={filteredEmployees.length > 0 && selectedIds.length === filteredEmployees.length} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" /></th>
-                               <th className="px-4 py-3">Employee</th>
-                               <th className="px-4 py-3 text-center">OT 1.35x</th>
-                               <th className="px-4 py-3 text-center">OT 1.7x</th>
-                               <th className="px-4 py-3 text-center">PH 2x</th>
-                               <th className="px-4 py-3 text-center">Worked Days</th>
-                               {columns.map(c => <th key={c.key} className="px-4 py-3">{c.label}</th>)}
-                               <th className="px-4 py-3">Net Pay</th>
-                               <th className="px-4 py-3 text-center">Action</th>
+                               <th className="px-4 py-3 min-w-[200px]">Employee</th>
+                               <th className="px-4 py-3 min-w-[150px]">Role / Project</th>
+                               <th className="px-4 py-3 min-w-[200px]">Bank Details</th>
+                               <th className="px-2 py-3 text-center">OT 1.35</th>
+                               <th className="px-2 py-3 text-center">OT 1.7</th>
+                               <th className="px-2 py-3 text-center">PH 2x</th>
+                               <th className="px-4 py-3 text-center w-24">Worked Days<br/><span className="text-[9px] font-normal text-slate-400">PRORATION</span></th>
+                               {columns.map(c => <th key={c.key} className={`px-4 py-3 min-w-[120px] border-l ${c.type==='entitlement'?'text-green-700 border-green-100':'text-red-600 border-red-100'}`}>{c.label}<span className="block text-[9px] font-normal opacity-70 uppercase">{c.type}</span></th>)}
+                               <th className="px-4 py-3 border-l">Net Pay</th>
+                               <th className="px-4 py-3 text-center">Actions</th>
                             </tr>
                          </thead>
                          <tbody className="divide-y divide-slate-100">
                             {filteredEmployees.map(emp => {
                                const net = calculateNet(emp);
                                const isSelected = selectedIds.includes(emp.id);
+                               const isProrated = emp.worked_days !== payrollSettings.daysPerMonth;
                                return (
                                   <tr key={emp.id} className={`hover:bg-slate-50 ${isSelected ? 'bg-blue-50' : ''}`}>
                                      <td className="px-6 py-4"><input type="checkbox" checked={isSelected} onChange={() => handleSelectRow(emp.id)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" /></td>
-                                     <td className="px-4 py-3">
-                                        <input type="text" value={emp.name} onChange={e => handleUpdateField(emp.id, 'name', e.target.value)} className="font-bold text-slate-800 bg-transparent w-full focus:outline-none"/>
-                                        <p className="text-xs text-slate-400">{emp.id}</p>
+                                     <td className="px-4 py-4">
+                                        <input type="text" value={emp.name} onChange={e => handleUpdateField(emp.id, 'name', e.target.value)} className="font-bold text-slate-800 bg-transparent w-full focus:outline-none mb-1"/>
+                                        <div className="flex flex-col text-xs text-slate-400 gap-0.5">
+                                           <span className="flex gap-1">EGID: <input value={emp.id} onChange={e => handleUpdateField(emp.id, 'id', e.target.value)} className="bg-transparent font-mono font-bold text-slate-500 focus:outline-none w-20"/></span>
+                                           <input value={emp.email} onChange={e => handleUpdateField(emp.id, 'email', e.target.value)} className="bg-transparent w-full focus:outline-none focus:text-slate-600"/>
+                                        </div>
                                      </td>
-                                     <td className="px-4 py-3 text-center"><input type="number" className="w-12 bg-slate-50 border rounded text-center text-xs p-1" value={emp.ot_135||0} onChange={e => handleUpdateField(emp.id, 'ot_135', e.target.value)} /></td>
-                                     <td className="px-4 py-3 text-center"><input type="number" className="w-12 bg-slate-50 border rounded text-center text-xs p-1" value={emp.ot_17||0} onChange={e => handleUpdateField(emp.id, 'ot_17', e.target.value)} /></td>
-                                     <td className="px-4 py-3 text-center"><input type="number" className="w-12 bg-purple-50 border border-purple-200 rounded text-center text-xs p-1" value={emp.ph_hours||0} onChange={e => handleUpdateField(emp.id, 'ph_hours', e.target.value)} /></td>
-                                     <td className="px-4 py-3 text-center"><input type="number" className="w-12 border rounded text-center text-xs p-1" value={emp.worked_days||30} onChange={e => handleUpdateField(emp.id, 'worked_days', e.target.value)} /></td>
+                                     <td className="px-4 py-4">
+                                        <div className="flex flex-col gap-1">
+                                           <div className="flex items-center gap-1 bg-slate-100 rounded px-1.5 py-0.5 w-fit"><Briefcase size={10} className="text-slate-400"/><input value={emp.role} onChange={e => handleUpdateField(emp.id, 'role', e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 w-24 focus:outline-none" placeholder="Role"/></div>
+                                           <div className="flex items-center gap-1 bg-blue-50 rounded px-1.5 py-0.5 w-fit"><span className="w-2 h-2 rounded-full bg-blue-400"></span><input value={emp.project} onChange={e => handleUpdateField(emp.id, 'project', e.target.value)} className="bg-transparent text-xs text-blue-700 w-24 focus:outline-none" placeholder="Project"/></div>
+                                        </div>
+                                     </td>
+                                     <td className="px-4 py-4">
+                                        <div className="flex flex-col gap-1 text-xs">
+                                           <div className="flex items-center gap-1 text-slate-500"><Building2 size={10}/><input value={emp.bank_name || ''} onChange={e => handleUpdateField(emp.id, 'bank_name', e.target.value)} className="bg-transparent focus:outline-none w-24" placeholder="Bank Name"/></div>
+                                           <div className="flex items-center gap-1 text-slate-500"><CreditCard size={10}/><input value={emp.iban || ''} onChange={e => handleUpdateField(emp.id, 'iban', e.target.value)} className="bg-transparent focus:outline-none w-32 font-mono" placeholder="IBAN"/></div>
+                                           <div className="flex items-center gap-1 font-bold text-slate-700"><DollarSign size={10}/><input value={emp.currency || 'EGP'} onChange={e => handleUpdateField(emp.id, 'currency', e.target.value)} className="bg-transparent focus:outline-none w-8"/></div>
+                                        </div>
+                                     </td>
+                                     <td className="px-2 py-4 text-center"><input type="number" className="w-10 bg-slate-50 border rounded text-center text-xs p-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value={emp.ot_135||0} onChange={e => handleUpdateField(emp.id, 'ot_135', e.target.value)} /></td>
+                                     <td className="px-2 py-4 text-center"><input type="number" className="w-10 bg-slate-50 border rounded text-center text-xs p-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value={emp.ot_17||0} onChange={e => handleUpdateField(emp.id, 'ot_17', e.target.value)} /></td>
+                                     <td className="px-2 py-4 text-center"><input type="number" className="w-10 bg-purple-50 border border-purple-200 rounded text-center text-xs p-1 focus:outline-none focus:ring-1 focus:ring-purple-500" value={emp.ph_hours||0} onChange={e => handleUpdateField(emp.id, 'ph_hours', e.target.value)} /></td>
+                                     <td className="px-4 py-4 text-center">
+                                        <input type="number" className={`w-12 border rounded text-center text-sm font-bold p-1 focus:outline-none ${isProrated ? 'border-orange-300 text-orange-600 bg-orange-50' : 'border-slate-200'}`} value={emp.worked_days||30} onChange={e => handleUpdateField(emp.id, 'worked_days', e.target.value)} />
+                                        {isProrated && <span className="block text-[9px] font-bold text-orange-500 mt-1">PRORATED</span>}
+                                     </td>
                                      {columns.map(col => (
-                                         <td key={col.key} className="px-4 py-3">
-                                            <input type="number" className="w-20 bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none" value={emp[col.key]||0} onChange={e => handleUpdateField(emp.id, col.key, e.target.value)} readOnly={col.key === 'overtime'} />
+                                         <td key={col.key} className={`px-4 py-4 border-l ${col.type==='entitlement'?'border-green-50':'border-red-50'}`}>
+                                            <div className="flex items-center">
+                                              <span className={`text-[10px] mr-1 font-bold ${col.type==='entitlement'?'text-green-500':'text-red-500'}`}>{col.type==='entitlement'?'+':'-'}</span>
+                                              <input type="number" className={`w-20 bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none text-sm ${col.key==='overtime'?'text-blue-600 font-bold':''}`} value={emp[col.key]||0} onChange={e => handleUpdateField(emp.id, col.key, e.target.value)} readOnly={col.key === 'overtime'} />
+                                            </div>
                                          </td>
                                      ))}
-                                     <td className="px-4 py-3 font-bold text-blue-900">{net.toLocaleString()}</td>
-                                     <td className="px-4 py-3 flex justify-center gap-2">
-                                        <button onClick={() => setPreviewId(emp.id)} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full"><Eye size={16}/></button>
-                                        <button onClick={() => handleWhatsApp(emp)} className="text-green-600 hover:bg-green-100 p-2 rounded-full" title="WhatsApp"><Phone size={16}/></button>
-                                        <button onClick={() => handleDeleteEmployee(emp.id)} className="text-red-500 hover:bg-red-100 p-2 rounded-full" title="Delete"><Trash2 size={16}/></button>
+                                     <td className="px-4 py-4 font-bold text-blue-900 border-l">{net.toLocaleString()}</td>
+                                     <td className="px-4 py-4 flex justify-center gap-2">
+                                        <button onClick={() => setPreviewId(emp.id)} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-full transition-colors"><Eye size={16}/></button>
+                                        <button onClick={() => handleWhatsApp(emp)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-full transition-colors" title="WhatsApp"><Phone size={16}/></button>
+                                        <button onClick={() => handleDeleteEmployee(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-full transition-colors" title="Delete"><Trash2 size={16}/></button>
                                      </td>
                                   </tr>
                                );
@@ -1432,60 +1437,16 @@ const AdminDashboard = ({ user, onLogout }) => {
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Settings size={24} className="text-blue-600" /> System Settings</h2>
-            
-            <div className="space-y-6">
-              {/* Payroll Configuration Section (RESTORED) */}
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h3 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><Clock size={16}/> Payroll Configuration</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Standard Days/Month</label>
-                    <input 
-                      type="number" 
-                      value={payrollSettings.daysPerMonth} 
-                      onChange={(e) => setPayrollSettings({...payrollSettings, daysPerMonth: parseFloat(e.target.value) || 0})} 
-                      className="w-full p-2 border border-slate-300 rounded text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Standard Hours/Day</label>
-                    <input 
-                      type="number" 
-                      value={payrollSettings.hoursPerDay} 
-                      onChange={(e) => setPayrollSettings({...payrollSettings, hoursPerDay: parseFloat(e.target.value) || 0})} 
-                      className="w-full p-2 border border-slate-300 rounded text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 text-right">
-                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    Current Divisor: {payrollSettings.daysPerMonth * payrollSettings.hoursPerDay} Hours
-                  </span>
-                </div>
-              </div>
-
-              {/* Email Configuration Section */}
-              <div>
-                <h3 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><Mail size={16}/> Email Service (EmailJS)</h3>
-                <div className="space-y-3">
-                  <div><label className="block text-xs font-medium text-slate-500 mb-1">Service ID</label><input type="text" value={emailConfig.serviceId} onChange={(e) => setEmailConfig({...emailConfig, serviceId: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm" placeholder="service_xxxxx" /></div>
-                  <div><label className="block text-xs font-medium text-slate-500 mb-1">Template ID</label><input type="text" value={emailConfig.templateId} onChange={(e) => setEmailConfig({...emailConfig, templateId: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm" placeholder="template_xxxxx" /></div>
-                  <div><label className="block text-xs font-medium text-slate-500 mb-1">Public Key</label><input type="text" value={emailConfig.publicKey} onChange={(e) => setEmailConfig({...emailConfig, publicKey: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm" placeholder="public_key_xxxxx" /></div>
-                </div>
-              </div>
-              
-              <div className="pt-4 border-t border-slate-100">
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MessageSquare size={16}/> Email Body Template</label>
-                <textarea 
-                  value={emailMessage} 
-                  onChange={(e) => setEmailMessage(e.target.value)} 
-                  className="w-full p-3 border border-slate-300 rounded-lg text-sm h-20 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Enter message..."
-                />
-              </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Settings</h2>
+            <div className="space-y-4">
+               <div><label className="block text-xs font-bold text-slate-500">EmailJS Service ID</label><input className="w-full border p-2 rounded" value={emailConfig.serviceId} onChange={e => setEmailConfig({...emailConfig, serviceId: e.target.value})}/></div>
+               <div><label className="block text-xs font-bold text-slate-500">EmailJS Template ID</label><input className="w-full border p-2 rounded" value={emailConfig.templateId} onChange={e => setEmailConfig({...emailConfig, templateId: e.target.value})}/></div>
+               <div><label className="block text-xs font-bold text-slate-500">EmailJS Public Key</label><input className="w-full border p-2 rounded" value={emailConfig.publicKey} onChange={e => setEmailConfig({...emailConfig, publicKey: e.target.value})}/></div>
             </div>
-            <div className="flex gap-3 mt-8"><Button variant="secondary" className="flex-1" onClick={() => setShowSettings(false)}>Cancel</Button><Button className="flex-1" onClick={saveEmailConfig}>Save All Settings</Button></div>
+            <div className="flex gap-2 mt-6">
+               <Button onClick={saveEmailConfig} className="flex-1">Save</Button>
+               <Button variant="secondary" onClick={() => setShowSettings(false)} className="flex-1">Cancel</Button>
+            </div>
           </div>
         </div>
       )}
@@ -1495,7 +1456,7 @@ const AdminDashboard = ({ user, onLogout }) => {
             employee={employees.find(e => e.id === previewId)} 
             columns={columns} 
             period={payrollPeriod} 
-            standardDays={payrollSettings.daysPerMonth} 
+            standardDays={30} 
             onClose={() => setPreviewId(null)}
          />
       )}
