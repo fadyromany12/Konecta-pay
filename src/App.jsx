@@ -27,11 +27,6 @@ const PRESET_COLUMNS = {
   deductions: ["Medical Insurance", "Social Security", "Absenteeism", "Loan Repayment", "Lateness Penalty", "Income Tax"]
 };
 
-const OVERTIME_RATES = {
-  standard: 1.5, // Standard/Night
-  holiday: 2.0   // Public Holiday
-};
-
 // --- LOGIC: Tax Calculator ---
 const calculateEgyptDeductions = (grossSalary) => {
   const insuranceCap = 12600;
@@ -70,8 +65,8 @@ const calculateEgyptDeductions = (grossSalary) => {
 };
 
 // --- LOGIC: Overtime Calculator ---
-const calculateOvertimeValue = (basicSalary, hours, rate = 1.5, divisor = 176) => {
-  // Divisor = Work Days * Daily Hours (e.g. 22 * 8 = 176)
+const calculateOvertimeValue = (basicSalary, hours, rate, divisor = 240) => {
+  // Divisor = Work Days * Daily Hours (e.g. 30 * 8 = 240)
   if (divisor === 0) return 0;
   const hourlyRate = basicSalary / divisor; 
   return Math.round(hourlyRate * hours * rate);
@@ -79,9 +74,9 @@ const calculateOvertimeValue = (basicSalary, hours, rate = 1.5, divisor = 176) =
 
 // --- LOGIC: Mock Data ---
 const generateMockData = () => [
-  { id: 'eg5441', name: 'Sarah Ahmed', role: 'CSR', email: 'sarah.ahmed@konecta.com', project: 'Vodafone UK', basic: 4500, bonus: 500, ot_hours: 5, ph_hours: 0, overtime: 192, bank_name: 'CIB', iban: 'EG1200000000001234567890', currency: 'EGP', worked_days: 22 },
-  { id: 'eg5442', name: 'Mohamed Ali', role: 'Team Leader', email: 'mohamed.ali@konecta.com', project: 'Orange Business', basic: 7200, bonus: 1200, ot_hours: 0, ph_hours: 8, overtime: 655, bank_name: 'QNB Alahli', iban: 'EG9800000000009876543210', currency: 'EGP', worked_days: 22 },
-  { id: 'eg5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 5800, bonus: 300, ot_hours: 2, ph_hours: 0, overtime: 99, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 22 },
+  { id: 'eg5441', name: 'Sarah Ahmed', role: 'CSR', email: 'sarah.ahmed@konecta.com', project: 'Vodafone UK', basic: 4500, bonus: 500, ot_135: 2, ot_15: 5, ot_17: 0, ph_hours: 0, overtime: 265, bank_name: 'CIB', iban: 'EG1200000000001234567890', currency: 'EGP', worked_days: 30 },
+  { id: 'eg5442', name: 'Mohamed Ali', role: 'Team Leader', email: 'mohamed.ali@konecta.com', project: 'Orange Business', basic: 7200, bonus: 1200, ot_135: 0, ot_15: 0, ot_17: 8, ph_hours: 8, overtime: 1250, bank_name: 'QNB Alahli', iban: 'EG9800000000009876543210', currency: 'EGP', worked_days: 30 },
+  { id: 'eg5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 5800, bonus: 300, ot_135: 0, ot_15: 2, ot_17: 0, ph_hours: 0, overtime: 105, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 30 },
 ];
 
 // --- COMPONENTS ---
@@ -108,7 +103,7 @@ const Button = ({ children, variant = "primary", onClick, disabled, className = 
 };
 
 // --- COMPONENT: Overtime Modal ---
-const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 176 }) => {
+const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 240 }) => {
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [hours, setHours] = useState(0);
   const [rate, setRate] = useState(1.5);
@@ -118,6 +113,8 @@ const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 176 }) =
   const handleApply = () => {
     const emp = employees.find(e => e.id === selectedEmpId);
     if (emp) {
+      // Just a helper to add single OT entry via modal if needed
+      // Note: This adds to existing 'overtime' value directly
       const val = calculateOvertimeValue(emp.basic || 0, hours, rate, divisor);
       onApply(selectedEmpId, val);
       onClose();
@@ -143,7 +140,9 @@ const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 176 }) =
 
         <label className="block text-sm font-bold text-slate-700 mb-1">Overtime Rate</label>
         <select className="w-full p-2 border border-slate-300 rounded-lg mb-6 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={rate} onChange={e => setRate(parseFloat(e.target.value))}>
-          <option value="1.5">Standard (1.5x)</option>
+          <option value="1.35">Day (1.35x)</option>
+          <option value="1.5">Night (1.5x)</option>
+          <option value="1.7">Rest Day (1.7x)</option>
           <option value="2.0">Public Holiday (2.0x)</option>
         </select>
         
@@ -160,8 +159,8 @@ const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 176 }) =
   );
 };
 
-// --- COMPONENT: Proration Modal (NEW) ---
-const ProrationModal = ({ isOpen, onClose, onApply, employees, columns, standardDays = 22 }) => {
+// --- COMPONENT: Proration Modal ---
+const ProrationModal = ({ isOpen, onClose, onApply, employees, columns, standardDays = 30 }) => {
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [daysWorked, setDaysWorked] = useState(standardDays);
   const [selectedCols, setSelectedCols] = useState(['basic']); // Default to basic
@@ -256,8 +255,10 @@ const PayslipDocument = ({ employee, columns, period, className = "" }) => {
   const year = date.getFullYear();
   const salaryPeriodStr = `${monthName} ${startDay} - ${monthName} ${lastDay}, ${year}`;
 
-  const otHours = employee.ot_hours || 0;
-  const phHours = employee.ph_hours || 0;
+  const ot135 = employee.ot_135 || 0;
+  const ot15 = employee.ot_15 || 0;
+  const ot17 = employee.ot_17 || 0;
+  const phHours = employee.ph_hours || 0; // 2.0x
   const otValue = employee.overtime || 0;
 
   return (
@@ -300,7 +301,6 @@ const PayslipDocument = ({ employee, columns, period, className = "" }) => {
             <div className="space-y-1">
               <p className="text-sm text-slate-600"><span className="text-slate-400">Bank:</span> {employee.bank_name || 'N/A'}</p>
               <p className="text-sm text-slate-600"><span className="text-slate-400">IBAN:</span> {employee.iban || 'N/A'}</p>
-              {/* UPDATED: Shows Period instead of Transfer Date in label too if preferred, but user said replace transfer date info. Keeping date here is usually good for transaction record, but I will focus on the main header change above. */}
               <p className="text-sm text-slate-600"><span className="text-slate-400">Salary Period:</span> {salaryPeriodStr}</p>
               <p className="text-sm text-slate-600"><span className="text-slate-400">Currency:</span> {employee.currency || 'EGP'}</p>
             </div>
@@ -372,13 +372,15 @@ const PayslipDocument = ({ employee, columns, period, className = "" }) => {
                 </div>
             </div>
             
-            {/* Overtime Tile (Requested) */}
-            {(otHours > 0 || phHours > 0) && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 w-40 flex flex-col justify-center">
-                    <p className="text-xs font-bold text-blue-800 uppercase mb-1">Overtime</p>
-                    <div className="text-sm text-slate-600">
-                        {otHours > 0 && <div>Std: {otHours} hrs <span className="text-[10px] text-slate-400">(1.5x)</span></div>}
-                        {phHours > 0 && <div>Hol: {phHours} hrs <span className="text-[10px] text-slate-400">(2.0x)</span></div>}
+            {/* Overtime Tile (Updated) */}
+            {(ot135 > 0 || ot15 > 0 || ot17 > 0 || phHours > 0) && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 w-48 flex flex-col justify-center">
+                    <p className="text-xs font-bold text-blue-800 uppercase mb-1">Overtime Breakdown</p>
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                        {ot135 > 0 && <div className="flex justify-between"><span>Day (1.35x)</span><span>{ot135}h</span></div>}
+                        {ot15 > 0 && <div className="flex justify-between"><span>Night (1.5x)</span><span>{ot15}h</span></div>}
+                        {ot17 > 0 && <div className="flex justify-between"><span>Rest (1.7x)</span><span>{ot17}h</span></div>}
+                        {phHours > 0 && <div className="flex justify-between"><span>Public (2.0x)</span><span>{phHours}h</span></div>}
                     </div>
                     <div className="mt-2 pt-2 border-t border-blue-100 font-bold text-blue-700 text-right">
                         {otValue.toLocaleString()} {employee.currency || 'EGP'}
@@ -430,9 +432,9 @@ export default function App() {
   const [emailConfig, setEmailConfig] = useState({ serviceId: '', templateId: '', publicKey: '' });
   const [emailMessage, setEmailMessage] = useState("Dear Employee,\n\nPlease find attached your payslip for this month.\n\nBest regards,\nKonecta Financial Team");
   
-  // NEW: Payroll Settings State
+  // NEW: Payroll Settings State (Default 30 Days)
   const [payrollSettings, setPayrollSettings] = useState({
-    daysPerMonth: 22,
+    daysPerMonth: 30, // Updated to 30
     hoursPerDay: 8
   });
 
@@ -586,7 +588,7 @@ export default function App() {
     showNotification(`Added ${label} (${type})`);
   };
 
-  // --- NEW: Smart CSV Import ---
+  // --- NEW: Smart CSV Import (Updated) ---
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -629,15 +631,17 @@ export default function App() {
         const standardMap = {
             'name': 'name', 'employee': 'name', 
             'email': 'email', 'e-mail': 'email',
-            'id': 'id', 'egid': 'id', 'eg id': 'id', 'employee id': 'id', // EGID Mapping
+            'id': 'id', 'egid': 'id', 'eg id': 'id', 'employee id': 'id',
             'project': 'project', 'department': 'project',
             'title': 'role', 'role': 'role', 'job title': 'role',
-            'ot hours': 'ot_hours', 'overtime hours': 'ot_hours',
-            'holiday hours': 'ph_hours', 'ph hours': 'ph_hours',
+            'ot 1.35': 'ot_135', 'day ot': 'ot_135',
+            'ot 1.5': 'ot_15', 'night ot': 'ot_15', 'ot hours': 'ot_15',
+            'ot 1.7': 'ot_17', 'rest ot': 'ot_17',
+            'holiday hours': 'ph_hours', 'ph hours': 'ph_hours', 'public holiday': 'ph_hours',
             'bank': 'bank_name', 'bank name': 'bank_name',
             'iban': 'iban', 'account number': 'iban',
             'currency': 'currency',
-            'worked days': 'worked_days', 'days worked': 'worked_days' // New worked days mapping
+            'worked days': 'worked_days', 'days worked': 'worked_days'
         };
 
         const newEmployees = [];
@@ -680,7 +684,13 @@ export default function App() {
             const vals = parseLine(lines[i]);
             if (vals.length < 2) continue; 
 
-            const emp = { id: `eg${Math.floor(Math.random()*9000)+1000}`, basic: 0, bonus: 0, ot_hours: 0, ph_hours: 0, bank_name: '', iban: '', currency: 'EGP', worked_days: standardDays, base_values: {} };
+            const emp = { 
+                id: `eg${Math.floor(Math.random()*9000)+1000}`, 
+                basic: 0, bonus: 0, 
+                ot_135: 0, ot_15: 0, ot_17: 0, ph_hours: 0, 
+                bank_name: '', iban: '', currency: 'EGP', 
+                worked_days: standardDays, base_values: {} 
+            };
             
             vals.forEach((val, idx) => {
                 if (idx >= columnMap.length) return;
@@ -688,7 +698,7 @@ export default function App() {
                 if (!map) return;
 
                 if (map.type === 'standard') {
-                    if (map.key === 'ot_hours' || map.key === 'ph_hours' || map.key === 'worked_days') {
+                    if (['ot_135', 'ot_15', 'ot_17', 'ph_hours', 'worked_days'].includes(map.key)) {
                        emp[map.key] = parseFloat(val) || 0;
                     } else {
                        emp[map.key] = val;
@@ -698,22 +708,22 @@ export default function App() {
                 }
             });
 
-            // Initialize base values for proratable fields
-            // Assumption: Imported value IS the prorated value if worked_days < standardDays? 
-            // Or is it the base value? 
-            // Usually import contains "Actual To Be Paid". So we reverse calc base.
+            // Initialize base values and Calc OT
             const ratio = (emp.worked_days > 0 && standardDays > 0) ? (emp.worked_days / standardDays) : 1;
             
-            // Set base values
             emp.base_values.basic = Math.round((emp.basic || 0) / ratio);
             newColumns.filter(c => c.type === 'entitlement' && c.key !== 'overtime' && c.key !== 'bonus').forEach(col => {
                const val = emp[col.key] || 0;
                emp.base_values[col.key] = Math.round(val / ratio);
             });
 
-            // Auto-calc OT value
             const basic = emp.basic || 0;
-            const otVal = calculateOvertimeValue(basic, emp.ot_hours || 0, 1.5, currentDivisor) + calculateOvertimeValue(basic, emp.ph_hours || 0, 2.0, currentDivisor);
+            const otVal = 
+                calculateOvertimeValue(basic, emp.ot_135 || 0, 1.35, currentDivisor) +
+                calculateOvertimeValue(basic, emp.ot_15 || 0, 1.5, currentDivisor) +
+                calculateOvertimeValue(basic, emp.ot_17 || 0, 1.7, currentDivisor) +
+                calculateOvertimeValue(basic, emp.ph_hours || 0, 2.0, currentDivisor);
+            
             emp.overtime = otVal;
 
             if (!emp.name) emp.name = 'Unknown';
@@ -731,7 +741,7 @@ export default function App() {
 
   // --- NEW: Smart Template Download ---
   const handleDownloadTemplate = () => {
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT Hours (1.5x)', 'Holiday Hours (2.0x)'];
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.5x', 'OT 1.7x', 'Holiday (2.0x)'];
     
     const exampleDeductions = ['(Ded) Medical Insurance', '(Ded) Social Security'];
     const financialHeaders = [...columns.map(c => c.key !== 'overtime' ? `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}` : '').filter(Boolean), ...exampleDeductions];
@@ -740,7 +750,7 @@ export default function App() {
     const headerRow = [...standardHeaders, ...uniqueHeaders].join(',');
     
     // Example Data
-    const standardData = ['John Doe', 'john.doe@konecta.com', 'Vodafone UK', 'CSR', 'eg1234', 'CIB', 'EG1200000000001234567890', 'EGP', payrollSettings.daysPerMonth, '5', '0'];
+    const standardData = ['John Doe', 'john.doe@konecta.com', 'Vodafone UK', 'CSR', 'eg1234', 'CIB', 'EG120000000000', 'EGP', payrollSettings.daysPerMonth, '2', '5', '0', '8'];
     const financialData = uniqueHeaders.map(() => '0'); 
     const dataRow = [...standardData, ...financialData].join(',');
 
@@ -816,7 +826,7 @@ export default function App() {
   const handleExportCSV = () => {
     if (employees.length === 0) return;
     
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT Hours', 'Holiday Hours'];
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.5', 'OT 1.7', 'Holiday'];
     const financialHeaders = columns.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
     const headers = [...standardHeaders, ...financialHeaders, 'Net Pay'];
 
@@ -834,7 +844,9 @@ export default function App() {
         esc(emp.iban || ''),
         esc(emp.currency || 'EGP'),
         esc(emp.worked_days || 0),
-        esc(emp.ot_hours || 0),
+        esc(emp.ot_135 || 0),
+        esc(emp.ot_15 || 0),
+        esc(emp.ot_17 || 0),
         esc(emp.ph_hours || 0),
         ...columns.map(c => emp[c.key] || 0), 
         net
@@ -933,35 +945,37 @@ export default function App() {
          });
       }
       // Handle Numeric Hours (OT Calc)
-      else if (field === 'ot_hours' || field === 'ph_hours') {
+      else if (['ot_135', 'ot_15', 'ot_17', 'ph_hours'].includes(field)) {
          updatedEmp[field] = parseFloat(value) || 0;
-         const basic = updatedEmp.basic || 0; // Use current (prorated) basic for OT calc? Or base? Usually current basic.
-         // Standard is usually: OT is based on Basic Salary. If salary is prorated, hourly rate effectively drops? 
-         // No, Hourly Rate is fixed based on contract. So we should use BASE basic for OT calc.
          const baseBasic = updatedEmp.base_values.basic || updatedEmp.basic || 0;
          
-         const otVal = calculateOvertimeValue(baseBasic, updatedEmp.ot_hours || 0, 1.5, currentDivisor);
-         const phVal = calculateOvertimeValue(baseBasic, updatedEmp.ph_hours || 0, 2.0, currentDivisor);
-         updatedEmp.overtime = otVal + phVal;
+         const otVal = 
+            calculateOvertimeValue(baseBasic, updatedEmp.ot_135 || 0, 1.35, currentDivisor) +
+            calculateOvertimeValue(baseBasic, updatedEmp.ot_15 || 0, 1.5, currentDivisor) +
+            calculateOvertimeValue(baseBasic, updatedEmp.ot_17 || 0, 1.7, currentDivisor) +
+            calculateOvertimeValue(baseBasic, updatedEmp.ph_hours || 0, 2.0, currentDivisor);
+            
+         updatedEmp.overtime = otVal;
       }
-      // Handle Money Fields (Manual Edits update BASE)
+      // Handle Money Fields
       else if (columns.find(c => c.key === field)) {
           const newVal = parseFloat(value) || 0;
           updatedEmp[field] = newVal;
           
-          // Reverse calculate Base Value
           const ratio = (updatedEmp.worked_days > 0 && standardDays > 0) ? (updatedEmp.worked_days / standardDays) : 1;
           
           if (field === 'basic' || (columns.find(c => c.key === field).type === 'entitlement' && field !== 'overtime' && field !== 'bonus')) {
              updatedEmp.base_values[field] = Math.round(newVal / ratio);
           }
 
-          // If updating basic, recalc overtime
           if (field === 'basic') {
              const baseBasic = updatedEmp.base_values.basic;
-             const otVal = calculateOvertimeValue(baseBasic, updatedEmp.ot_hours || 0, 1.5, currentDivisor);
-             const phVal = calculateOvertimeValue(baseBasic, updatedEmp.ph_hours || 0, 2.0, currentDivisor);
-             updatedEmp.overtime = otVal + phVal;
+             const otVal = 
+                calculateOvertimeValue(baseBasic, updatedEmp.ot_135 || 0, 1.35, currentDivisor) +
+                calculateOvertimeValue(baseBasic, updatedEmp.ot_15 || 0, 1.5, currentDivisor) +
+                calculateOvertimeValue(baseBasic, updatedEmp.ot_17 || 0, 1.7, currentDivisor) +
+                calculateOvertimeValue(baseBasic, updatedEmp.ph_hours || 0, 2.0, currentDivisor);
+             updatedEmp.overtime = otVal;
           }
       }
 
@@ -1294,9 +1308,12 @@ export default function App() {
                          <th className="px-6 py-4 min-w-[150px] bg-slate-50">Employee</th>
                          <th className="px-6 py-4 bg-slate-50">Role / Project</th>
                          <th className="px-6 py-4 bg-slate-50 min-w-[180px]">Bank Details</th>
-                         <th className="px-6 py-4 bg-slate-50 w-24">OT Hours<br/><span className="text-[10px] text-slate-400 font-normal">1.5x</span></th>
-                         <th className="px-6 py-4 bg-slate-50 w-24">Holiday Hrs<br/><span className="text-[10px] text-slate-400 font-normal">2.0x</span></th>
-                         {/* New Worked Days Column */}
+                         {/* New OT Headers */}
+                         <th className="px-2 py-4 bg-slate-50 w-16 text-center text-xs font-bold text-slate-600">OT<br/><span className="text-[9px] text-slate-400 font-normal">1.35x</span></th>
+                         <th className="px-2 py-4 bg-slate-50 w-16 text-center text-xs font-bold text-slate-600">OT<br/><span className="text-[9px] text-slate-400 font-normal">1.5x</span></th>
+                         <th className="px-2 py-4 bg-slate-50 w-16 text-center text-xs font-bold text-slate-600">OT<br/><span className="text-[9px] text-slate-400 font-normal">1.7x</span></th>
+                         <th className="px-2 py-4 bg-slate-50 w-16 text-center text-xs font-bold text-slate-600">PH<br/><span className="text-[9px] text-slate-400 font-normal">2.0x</span></th>
+                         
                          <th className="px-6 py-4 bg-slate-50 w-24">Worked Days<br/><span className="text-[10px] text-slate-400 font-normal">Proration</span></th>
                          {columns.map(col => (<th key={col.key} className={`px-6 py-4 min-w-[120px] bg-slate-50 border-l ${col.type === 'entitlement' ? 'border-green-100 text-green-700' : 'border-red-100 text-red-600'}`}>{col.label} <span className="text-[10px] opacity-70 block">{col.type}</span></th>))}
                          <th className="px-6 py-4 font-bold text-slate-800 bg-slate-50 border-l">Net Pay</th><th className="px-6 py-4 text-center bg-slate-50 sticky right-0">Actions</th>
@@ -1307,7 +1324,7 @@ export default function App() {
                          const net = calculateNet(emp);
                          const isSelected = selectedIds.includes(emp.id);
                          const hasOvertime = (emp.overtime || 0) > 0;
-                         const isProrated = (emp.worked_days < payrollSettings.daysPerMonth);
+                         const isProrated = (emp.worked_days !== payrollSettings.daysPerMonth);
                          
                          return (
                            <tr key={emp.id} className={`transition-colors group ${isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'}`}>
@@ -1392,23 +1409,40 @@ export default function App() {
                                </div>
                              </td>
                              
-                             {/* OT Hours Input */}
-                             <td className={`px-6 py-4 ${isSelected ? 'bg-blue-50 group-hover:bg-blue-100' : 'bg-white group-hover:bg-slate-50'}`}>
+                             {/* OT 1.35x */}
+                             <td className={`px-2 py-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
                                <input 
                                  type="number" 
-                                 value={emp.ot_hours || 0} 
-                                 onChange={(e) => handleUpdateField(emp.id, 'ot_hours', e.target.value)}
-                                 className="w-16 bg-white border border-slate-200 rounded px-2 py-1 text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                 value={emp.ot_135 || 0} 
+                                 onChange={(e) => handleUpdateField(emp.id, 'ot_135', e.target.value)}
+                                 className="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                />
                              </td>
-
-                             {/* Holiday Hours Input */}
-                             <td className={`px-6 py-4 ${isSelected ? 'bg-blue-50 group-hover:bg-blue-100' : 'bg-white group-hover:bg-slate-50'}`}>
+                             {/* OT 1.5x */}
+                             <td className={`px-2 py-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                               <input 
+                                 type="number" 
+                                 value={emp.ot_15 || 0} 
+                                 onChange={(e) => handleUpdateField(emp.id, 'ot_15', e.target.value)}
+                                 className="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                               />
+                             </td>
+                             {/* OT 1.7x */}
+                             <td className={`px-2 py-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                               <input 
+                                 type="number" 
+                                 value={emp.ot_17 || 0} 
+                                 onChange={(e) => handleUpdateField(emp.id, 'ot_17', e.target.value)}
+                                 className="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                               />
+                             </td>
+                             {/* Holiday 2.0x */}
+                             <td className={`px-2 py-4 ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
                                <input 
                                  type="number" 
                                  value={emp.ph_hours || 0} 
                                  onChange={(e) => handleUpdateField(emp.id, 'ph_hours', e.target.value)}
-                                 className="w-16 bg-white border border-slate-200 rounded px-2 py-1 text-center focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                 className="w-12 bg-purple-50 border border-purple-200 rounded px-1 py-1 text-center text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none"
                                />
                              </td>
 
