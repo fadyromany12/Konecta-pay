@@ -705,10 +705,11 @@ const AdminDashboard = ({ user, onLogout }) => {
       logAction('Database Sync', `Updated/Added ${count} employee records`);
     } catch (e) {
       console.error(e);
-      showNotification('Failed to save: ' + e.message, 'error');
       // CRITICAL: Explicit warning for permissions
       if (e.code === 'permission-denied') {
-        alert("PERMISSION DENIED: You do not have write access to Firestore. Please check your Firebase Console Rules.");
+        alert("PERMISSION DENIED: You do not have write access to Firestore. Please check your Firebase Console Rules. They might be set to 'allow write: if false;'.");
+      } else {
+        alert('Failed to save: ' + e.message);
       }
     } finally {
         setIsSaving(false);
@@ -771,9 +772,10 @@ const AdminDashboard = ({ user, onLogout }) => {
       }, 1500);
     } catch (e) {
       console.error("Batch write failed: ", e);
-      showNotification('Failed to publish: ' + e.message, 'error');
       if (e.code === 'permission-denied') {
-        alert("PERMISSION DENIED: Check Firestore Rules in Firebase Console.");
+        alert("PERMISSION DENIED: Check Firestore Rules in Firebase Console. You likely need to change 'allow write: if false;' to 'allow write: if request.auth != null;'.");
+      } else {
+         alert('Failed to publish: ' + e.message);
       }
       setView('review');
     }
