@@ -697,11 +697,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     setView('sending');
     setSendingProgress(0);
 
-    // BATCHING: Firestore batches are limited to 500 ops.
-    // For production, we should chunk this array. Here assuming small batches < 500 for simplicity.
     const batch = writeBatch(db);
-    
-    // 1. Create Payslip Documents
     targetList.forEach((emp) => {
         const docRef = doc(collection(db, "payslips"));
         batch.set(docRef, {
@@ -714,7 +710,6 @@ const AdminDashboard = ({ user, onLogout }) => {
         });
     });
 
-    // 2. Create History Entry
     const totalAmount = targetList.reduce((sum, emp) => {
         let net = 0;
         columns.forEach(col => {
@@ -731,7 +726,8 @@ const AdminDashboard = ({ user, onLogout }) => {
         year: payrollPeriod.year,
         count: targetList.length,
         total: totalAmount,
-        status: 'Completed'
+        status: 'Completed',
+        createdAt: serverTimestamp() // Fixed sorting issue
     });
 
     try {
@@ -744,8 +740,8 @@ const AdminDashboard = ({ user, onLogout }) => {
           setSelectedIds([]);
       }, 1500);
     } catch (e) {
-      console.error(e);
-      showNotification('Failed to publish payslips', 'error');
+      console.error("Batch write failed: ", e);
+      showNotification('Failed to publish payslips: ' + e.message, 'error');
       setView('review');
     }
   };
