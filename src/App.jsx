@@ -961,7 +961,7 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const handleDownloadTemplate = () => {
     // Aligned template structure with CSV reader expectations
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Public Holiday'];
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
     
     // Only add purely financial custom columns
     const financialHeaders = columns
