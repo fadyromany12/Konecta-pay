@@ -6,7 +6,7 @@ import {
   Mail, Key, HelpCircle, UserPlus, FileUp, Save, Filter, CheckSquare,
   Database, Clock, RotateCcw, CreditCard, PieChart, Printer, ClipboardList,
   MessageSquare, Phone, ArrowLeft, Briefcase, DollarSign, Building2, Scissors,
-  LogOut, Cloud, Lock
+  LogOut, Cloud, Lock, Loader2
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -118,7 +118,7 @@ const calculateOvertimeValue = (basicSalary, hours, rate, divisor = 240) => {
 const generateMockData = () => [
   { id: 'EG5441', name: 'Sarah Ahmed', role: 'CSR', email: 'sarah.ahmed@konecta.com', project: 'Vodafone UK', basic: 10000, bonus: 500, ot_135: 2, ot_17: 0, ph_hours: 0, overtime: 265, bank_name: 'CIB', iban: 'EG1200000000001234567890', currency: 'EGP', worked_days: 30 },
   { id: 'EG5442', name: 'Mohamed Ali', role: 'Team Leader', email: 'mohamed.ali@konecta.com', project: 'Orange Business', basic: 15000, bonus: 1200, ot_135: 0, ot_17: 8, ph_hours: 8, overtime: 1250, bank_name: 'QNB Alahli', iban: 'EG9800000000009876543210', currency: 'EGP', worked_days: 30 },
-  { id: 'EG5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 12000, bonus: 300, ot_135: 0, ot_17: 0, ph_hours: 0, overtime: 105, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 25 }, // Prorated example
+  { id: 'EG5443', name: 'Layla Youssef', role: 'QA Specialist', email: 'layla.youssef@konecta.com', project: 'Amazon DE', basic: 12000, bonus: 300, ot_135: 0, ot_17: 0, ph_hours: 0, overtime: 105, bank_name: 'HSBC', iban: 'EG5500000000005555555555', currency: 'EGP', worked_days: 25 },
 ];
 
 // --- COMPONENTS ---
@@ -130,11 +130,11 @@ const Card = ({ children, className = "" }) => (
 
 const Button = ({ children, variant = "primary", onClick, disabled, className = "", icon: Icon }) => {
   const variants = {
-    primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200",
-    secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
-    success: "bg-green-600 text-white hover:bg-green-700",
-    outline: "border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+    primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 transition-all active:scale-95",
+    secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-all active:scale-95",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95",
+    success: "bg-green-600 text-white hover:bg-green-700 transition-all active:scale-95",
+    outline: "border-2 border-blue-600 text-blue-600 hover:bg-blue-50 transition-all active:scale-95"
   };
   return (
     <button onClick={onClick} disabled={disabled} className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${variants[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
@@ -169,14 +169,14 @@ const LoginScreen = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-300">
         <div className="bg-blue-900 p-8 text-center">
-           <img src="https://i.ibb.co/zh1JWQLB/konecta-favicon.jpg" alt="Konecta Logo" className="h-12 w-auto mx-auto mb-4 bg-white rounded-lg p-1" />
-          <h1 className="text-2xl font-bold text-white">Konecta Pay</h1>
+           <img src="https://i.ibb.co/zh1JWQLB/konecta-favicon.jpg" alt="Konecta Logo" className="h-16 w-auto mx-auto mb-4 bg-white rounded-lg p-2 shadow-lg" />
+          <h1 className="text-2xl font-bold text-white tracking-tight">Konecta Pay</h1>
           <p className="text-blue-200 text-sm mt-1">Secure Payroll Portal</p>
         </div>
         <div className="p-8">
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 flex items-center gap-2 border border-red-100"><AlertCircle size={16}/> {error}</div>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
@@ -193,7 +193,7 @@ const LoginScreen = ({ onLogin }) => {
               </div>
             </div>
             <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-200 transition-all flex justify-center items-center gap-2">
-              {loading ? 'Authenticating...' : <><LogOut size={18} className="rotate-180"/> Login to System</>}
+              {loading ? <Loader2 className="animate-spin" size={18}/> : <><LogOut size={18} className="rotate-180"/> Login to System</>}
             </button>
           </form>
           <div className="mt-6 text-center text-xs text-slate-400">Protected by Firebase Security • Konecta Egypt</div>
@@ -228,7 +228,6 @@ const OvertimeModal = ({ isOpen, onClose, onApply, employees, divisor = 240 }) =
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full"><X size={18}/></button>
         </div>
         
-        {/* WARNING NOTIFICATION AS REQUESTED */}
         <div className="bg-amber-50 border-l-4 border-amber-500 p-3 mb-4 rounded-r">
           <p className="text-amber-700 text-xs font-bold flex items-center gap-2">
             <AlertCircle size={14}/> Warning: Enter Hours, Not Days!
@@ -324,9 +323,7 @@ const ProrationModal = ({ isOpen, onClose, onApply, employees, columns, standard
 
 // --- COMPONENT: PayslipDocument ---
 const PayslipDocument = ({ employee, columns, period, standardDays, className = "" }) => {
-  // Ensure columns is an array
   const safeColumns = columns || [];
-
   const filterZeroes = (cols) => cols.filter(col => {
     const val = employee[col.key] || 0;
     return MANDATORY_FIELDS.includes(col.key) || val !== 0;
@@ -342,7 +339,6 @@ const PayslipDocument = ({ employee, columns, period, standardDays, className = 
   const totalDeductions = allDeductions.reduce((sum, col) => sum + (employee[col.key] || 0), 0);
   const netSalary = totalEarnings - totalDeductions;
   
-  // Salary Period Logic
   const date = new Date(period.year, period.month, 1);
   const startDay = 1;
   const lastDay = new Date(period.year, period.month + 1, 0).getDate(); 
@@ -511,10 +507,10 @@ const EmployeePortal = ({ user, onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex justify-between items-center">
           <div className="flex items-center gap-3">
-             <img src="https://i.ibb.co/zh1JWQLB/konecta-favicon.jpg" alt="Logo" className="h-8 w-auto" />
-             <span className="font-bold text-blue-900 hidden sm:block">Konecta Employee Portal</span>
+             <img src="https://i.ibb.co/zh1JWQLB/konecta-favicon.jpg" alt="Logo" className="h-10 w-auto" />
+             <span className="font-bold text-blue-900 text-xl hidden sm:block">Konecta Employee</span>
           </div>
           <div className="flex items-center gap-4">
              <div className="text-right hidden sm:block">
@@ -528,7 +524,7 @@ const EmployeePortal = ({ user, onLogout }) => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <FileText className="text-blue-600"/> My Payslips
         </h2>
@@ -630,7 +626,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const [newColData, setNewColData] = useState({ label: '', type: 'deduction' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
-  const [uploading, setUploading] = useState(false); // Added Uploading State
+  const [uploading, setUploading] = useState(false); 
 
   // --- SYNC WITH FIRESTORE ---
   useEffect(() => {
@@ -673,22 +669,27 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   // --- ACTIONS ---
   const saveMasterDB = async () => {
-    const batch = writeBatch(db);
-    let count = 0;
-    for (const emp of employees) {
-        const existing = masterDB.find(m => m.id === emp.id);
-        if (existing) {
-            const ref = doc(db, 'employees', existing.firebaseId);
-            batch.update(ref, emp);
-        } else {
-            const ref = doc(collection(db, 'employees'));
-            batch.set(ref, emp);
-        }
-        count++;
+    try {
+      const batch = writeBatch(db);
+      let count = 0;
+      for (const emp of employees) {
+          const existing = masterDB.find(m => m.id === emp.id);
+          if (existing) {
+              const ref = doc(db, 'employees', existing.firebaseId);
+              batch.update(ref, emp);
+          } else {
+              const ref = doc(collection(db, 'employees'));
+              batch.set(ref, emp);
+          }
+          count++;
+      }
+      await batch.commit();
+      showNotification(`Synced ${count} records to Cloud Database!`);
+      logAction('Database Sync', `Updated/Added ${count} employee records`);
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to save to database', 'error');
     }
-    await batch.commit();
-    showNotification(`Synced ${count} records to Cloud.`);
-    logAction('Database Sync', `Updated/Added ${count} employee records`);
   };
 
   const startSendingProcess = async () => {
@@ -696,7 +697,11 @@ const AdminDashboard = ({ user, onLogout }) => {
     setView('sending');
     setSendingProgress(0);
 
+    // BATCHING: Firestore batches are limited to 500 ops.
+    // For production, we should chunk this array. Here assuming small batches < 500 for simplicity.
     const batch = writeBatch(db);
+    
+    // 1. Create Payslip Documents
     targetList.forEach((emp) => {
         const docRef = doc(collection(db, "payslips"));
         batch.set(docRef, {
@@ -709,6 +714,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         });
     });
 
+    // 2. Create History Entry
     const totalAmount = targetList.reduce((sum, emp) => {
         let net = 0;
         columns.forEach(col => {
@@ -728,15 +734,20 @@ const AdminDashboard = ({ user, onLogout }) => {
         status: 'Completed'
     });
 
-    await batch.commit();
-    setSendingProgress(100);
-    logAction('Payroll Run', `Published ${targetList.length} payslips`);
-
-    setTimeout(() => {
-        setView('dashboard');
-        showNotification(`Successfully published ${targetList.length} payslips!`);
-        setSelectedIds([]);
-    }, 1500);
+    try {
+      await batch.commit();
+      setSendingProgress(100);
+      logAction('Payroll Run', `Published ${targetList.length} payslips`);
+      setTimeout(() => {
+          setView('dashboard');
+          showNotification(`Successfully published ${targetList.length} payslips!`);
+          setSelectedIds([]);
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+      showNotification('Failed to publish payslips', 'error');
+      setView('review');
+    }
   };
 
   const saveEmailConfig = () => {
@@ -781,8 +792,8 @@ const AdminDashboard = ({ user, onLogout }) => {
 
         const parseLine = (line) => {
             const res = [];
-            let current = '';
             let inQuote = false;
+            let current = '';
             for (let i = 0; i < line.length; i++) {
                 const c = line[i];
                 if (c === '"') { inQuote = !inQuote; continue; }
@@ -1068,7 +1079,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     const maxSpending = Math.max(...Object.values(spendingByRole), 1);
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="p-6 border-l-4 border-l-blue-600">
             <div className="flex justify-between items-start"><div><p className="text-slate-500 text-sm font-medium">Last Batch Sent</p><h3 className="text-xl font-bold text-slate-800 mt-1">{lastBatch ? new Date(lastBatch.date).toLocaleDateString() : 'No Data'}</h3></div><div className="bg-blue-50 p-3 rounded-lg text-blue-600"><Clock size={24} /></div></div>
@@ -1142,24 +1153,24 @@ const AdminDashboard = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
            <div className="flex items-center gap-4">
-              <h1 className="text-lg font-bold text-slate-700 capitalize">{view}</h1>
+              <h1 className="text-lg font-bold text-slate-700 capitalize">{view === 'dashboard' && 'Financial Overview'}{view === 'upload' && 'Payroll Run'}{view === 'review' && 'Payroll Revision'}{view === 'sending' && 'Processing'}{view === 'audit' && 'System Audit Logs'}{view === 'history' && 'Transaction History'}{view === 'database' && 'Master Database'}</h1>
               {(view === 'upload' || view === 'review') && <PeriodSelector/>}
            </div>
            <div className="flex items-center gap-3"><span className="text-sm text-slate-500">Admin: <strong>{user.email}</strong></span></div>
         </header>
         
         <div className="flex-1 overflow-y-auto p-8 relative">
-           {notification && <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-500'}`}>{notification.message}</div>}
+           {notification && <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white animate-in fade-in slide-in-from-top-2 ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-500'}`}>{notification.message}</div>}
 
            {view === 'dashboard' && <Dashboard />}
 
            {view === 'upload' && (
-              <div className="max-w-xl mx-auto mt-10 bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
+              <div className="max-w-xl mx-auto mt-10 bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center animate-in zoom-in-95 duration-200">
                  <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6"><Cloud size={40} /></div>
                  <h2 className="text-2xl font-bold text-slate-800 mb-2">Payroll Run</h2>
                  <p className="text-slate-500 mb-6">Import data to start processing for {MONTHS[payrollPeriod.month]}.</p>
                  <div className="space-y-3">
-                   <div className="relative"><input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/><Button className="w-full py-3" icon={FileUp}>{uploading ? 'Processing...' : 'Upload CSV File'}</Button></div>
+                   <div className="relative"><input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/><Button className="w-full py-3" icon={FileUp}>{uploading ? <Loader2 className="animate-spin" /> : 'Upload CSV File'}</Button></div>
                    <Button variant="secondary" onClick={handleDownloadTemplate} className="w-full" icon={Download}>Download Template</Button>
                    <Button variant="secondary" onClick={() => { setEmployees(masterDB); setView('review'); }} className="w-full" icon={Database}>Load from Master DB</Button>
                    <Button variant="secondary" onClick={handleImportMock} className="w-full">Load Demo Data</Button>
@@ -1182,9 +1193,9 @@ const AdminDashboard = ({ user, onLogout }) => {
                       <Button icon={Send} onClick={startSendingProcess}>Approve & Publish</Button>
                    </div>
                 </div>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
                    <div className="p-4 border-b border-slate-200 flex gap-4">
-                      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search employees..." className="w-full pl-9 py-2 border rounded-lg text-sm"/></div>
+                      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search employees..." className="w-full pl-9 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div>
                       <div className="flex gap-2"><Button variant="secondary" className="text-xs" icon={UserPlus} onClick={handleAddEmployee}>Add</Button><Button variant="secondary" className="text-xs" icon={Plus} onClick={() => setShowAddColModal(true)}>Column</Button></div>
                    </div>
                    <div className="overflow-auto flex-1">
@@ -1240,7 +1251,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                                         {isProrated && <span className="block text-[9px] font-bold text-orange-500 mt-1">PRORATED</span>}
                                      </td>
                                      {columns.map(col => (
-                                         <td key={col.key} className={`px-4 py-4 border-l ${col.type==='entitlement'?'border-green-50':'border-red-50'}`}>
+                                         <td key={col.key} className={`px-4 py-4 border-l ${col.type==='entitlement'?'border-green-50 bg-green-50/20':'border-red-50 bg-red-50/20'}`}>
                                             <div className="flex items-center">
                                               <span className={`text-[10px] mr-1 font-bold ${col.type==='entitlement'?'text-green-500':'text-red-500'}`}>{col.type==='entitlement'?'+':'-'}</span>
                                               <input type="number" className={`w-20 bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none text-sm ${col.key==='overtime'?'text-blue-600 font-bold':''}`} value={emp[col.key]||0} onChange={e => handleUpdateField(emp.id, col.key, e.target.value)} readOnly={col.key === 'overtime'} />
