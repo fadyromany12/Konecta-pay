@@ -160,7 +160,7 @@ const LoginScreen = ({ onLogin }) => {
       const role = ADMIN_EMAILS.includes(email.toLowerCase()) ? 'admin' : 'employee';
       onLogin(userCredential.user, role);
     } catch (err) {
-      setError('Invalid email or password. Please try again.');
+      setError('Invalid email or password. ' + err.message);
       console.error(err);
     } finally {
       FLoading(false);
@@ -626,13 +626,16 @@ const AdminDashboard = ({ user, onLogout }) => {
   const [newColData, setNewColData] = useState({ label: '', type: 'deduction' });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
-  const [uploading, setUploading] = useState(false); 
+  const [uploading, setUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // --- SYNC WITH FIRESTORE ---
   useEffect(() => {
     const unsubEmp = onSnapshot(collection(db, 'employees'), (snap) => {
       const data = snap.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id }));
       setMasterDB(data);
+      // Auto-load if empty
+      setEmployees(prev => prev.length === 0 && data.length > 0 ? data : prev);
     });
     const unsubLogs = onSnapshot(query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc')), (snap) => {
       setAuditLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -652,14 +655,16 @@ const AdminDashboard = ({ user, onLogout }) => {
   }, []);
 
   const logAction = async (action, details) => {
-    const newLog = {
-      createdAt: serverTimestamp(),
-      timestamp: new Date().toLocaleString(),
-      user: user.email,
-      action,
-      details
-    };
-    await addDoc(collection(db, 'audit_logs'), newLog);
+    try {
+      const newLog = {
+        createdAt: serverTimestamp(),
+        timestamp: new Date().toLocaleString(),
+        user: user.email,
+        action,
+        details
+      };
+      await addDoc(collection(db, 'audit_logs'), newLog);
+    } catch (e) { console.error("Log error:", e); }
   };
 
   const showNotification = (message, type = 'success') => {
@@ -669,6 +674,12 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   // --- ACTIONS ---
   const saveMasterDB = async () => {
+    setIsSaving(true);
+    if(employees.length === 0) {
+        showNotification('No employees to save', 'error');
+        setIsSaving(false);
+        return;
+    }
     try {
       const batch = writeBatch(db);
       let count = 0;
@@ -688,16 +699,25 @@ const AdminDashboard = ({ user, onLogout }) => {
       logAction('Database Sync', `Updated/Added ${count} employee records`);
     } catch (e) {
       console.error(e);
-      showNotification('Failed to save to database', 'error');
+      showNotification('Failed to save: ' + e.message, 'error');
+    } finally {
+        setIsSaving(false);
     }
   };
 
   const startSendingProcess = async () => {
     const targetList = selectedIds.length > 0 ? employees.filter(e => selectedIds.includes(e.id)) : employees;
+    
+    if(targetList.length === 0) {
+        showNotification("No employees selected to publish", "error");
+        return;
+    }
+
     setView('sending');
     setSendingProgress(0);
 
     const batch = writeBatch(db);
+    
     targetList.forEach((emp) => {
         const docRef = doc(collection(db, "payslips"));
         batch.set(docRef, {
@@ -727,7 +747,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         count: targetList.length,
         total: totalAmount,
         status: 'Completed',
-        createdAt: serverTimestamp() // Fixed sorting issue
+        createdAt: serverTimestamp() 
     });
 
     try {
@@ -741,7 +761,7 @@ const AdminDashboard = ({ user, onLogout }) => {
       }, 1500);
     } catch (e) {
       console.error("Batch write failed: ", e);
-      showNotification('Failed to publish payslips: ' + e.message, 'error');
+      showNotification('Failed to publish: ' + e.message, 'error');
       setView('review');
     }
   };
@@ -1180,7 +1200,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                    <div><h2 className="text-xl font-bold">Review Data</h2><p className="text-slate-500">Auto-calculate taxes or manually edit before sending.</p></div>
                    <div className="flex gap-2">
                       {selectedIds.length > 0 && <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-3 animate-in fade-in zoom-in border border-blue-100"><span className="text-sm font-bold text-blue-800">{selectedIds.length} Selected</span><button onClick={handleBulkDelete} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-sm font-medium"><Trash2 size={16}/> Delete</button><div className="w-px h-4 bg-blue-200"></div><button onClick={startSendingProcess} className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm font-bold"><Send size={16}/> Send Selected</button></div>}
-                      <Button variant="secondary" icon={Save} onClick={saveMasterDB}>Save to Cloud DB</Button>
+                      <Button variant="secondary" icon={Save} onClick={saveMasterDB}>{isSaving ? <Loader2 className="animate-spin" /> : 'Save to Cloud DB'}</Button>
                       <Button variant="secondary" icon={FileDown} onClick={handleExportCSV}>Export CSV</Button>
                       <Button variant="secondary" icon={Printer} onClick={() => setView('print-batch')}>Print All</Button>
                       <Button variant="outline" icon={Scissors} onClick={() => setShowProrationModal(true)}>Prorate</Button>
