@@ -65,6 +65,12 @@ const MONTHS = [
 
 const MANDATORY_FIELDS = ['basic', 'social_ins', 'income_tax'];
 
+// Standard fields that should NOT be treated as dynamic columns
+const STANDARD_FIELDS = [
+    'name', 'email', 'role', 'project', 'id', 'bank_name', 'iban', 'currency', 
+    'worked_days', 'ot_135', 'ot_17', 'ph_hours', 'overtime', 'basic'
+];
+
 const PRESET_COLUMNS = {
   entitlements: ["Transportation", "Meal Allowance", "Shift Allowance", "KPI Bonus"],
   deductions: ["Medical Insurance", "Social Security", "Absenteeism", "Loan Repayment", "Lateness Penalty", "Income Tax"]
@@ -634,7 +640,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     const unsubEmp = onSnapshot(collection(db, 'employees'), (snap) => {
       const data = snap.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id }));
       setMasterDB(data);
-      // Auto-load if empty
+      // Auto-load logic: if employees is empty but masterDB has data, load it.
       setEmployees(prev => prev.length === 0 && data.length > 0 ? data : prev);
     });
     const unsubLogs = onSnapshot(query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc')), (snap) => {
@@ -700,6 +706,10 @@ const AdminDashboard = ({ user, onLogout }) => {
     } catch (e) {
       console.error(e);
       showNotification('Failed to save: ' + e.message, 'error');
+      // CRITICAL: Explicit warning for permissions
+      if (e.code === 'permission-denied') {
+        alert("PERMISSION DENIED: You do not have write access to Firestore. Please check your Firebase Console Rules.");
+      }
     } finally {
         setIsSaving(false);
     }
@@ -762,6 +772,9 @@ const AdminDashboard = ({ user, onLogout }) => {
     } catch (e) {
       console.error("Batch write failed: ", e);
       showNotification('Failed to publish: ' + e.message, 'error');
+      if (e.code === 'permission-denied') {
+        alert("PERMISSION DENIED: Check Firestore Rules in Firebase Console.");
+      }
       setView('review');
     }
   };
@@ -834,6 +847,14 @@ const AdminDashboard = ({ user, onLogout }) => {
         const columnMap = headers.map((h, idx) => {
             const lower = h.toLowerCase().replace(/['"]/g, '').trim();
             if (standardMap[lower]) return { type: 'standard', key: standardMap[lower] };
+            
+            // Check if it's a known standard field to skip dynamic column creation
+            // Fixes "role and bank details showing as ent"
+            const potentialKey = h.toLowerCase().replace(/['" ]/g, '_');
+            if (STANDARD_FIELDS.some(sf => potentialKey.includes(sf))) {
+               return null; 
+            }
+
             let type = 'entitlement';
             let label = h.replace(/['"]/g, '').trim();
             if (lower.startsWith('(ded)') || lower.startsWith('-')) { type = 'deduction'; label = label.replace(/^(\(Ded\)|-)\s?/i, ''); }
@@ -863,7 +884,7 @@ const AdminDashboard = ({ user, onLogout }) => {
             vals.forEach((val, idx) => {
                 if (idx >= columnMap.length) return;
                 const map = columnMap[idx];
-                if (!map) return;
+                if (!map) return; // Skip if null (standard field handled elsewhere or ignored)
                 if (map.type === 'standard') emp[map.key] = ['ot_135','ot_17','ph_hours','worked_days'].includes(map.key) ? parseFloat(val)||0 : val;
                 else if (map.type === 'financial') emp[map.key] = parseFloat(val.replace(/[$,]/g, '')) || 0;
             });
@@ -939,12 +960,18 @@ const AdminDashboard = ({ user, onLogout }) => {
   };
 
   const handleDownloadTemplate = () => {
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
-    const financialHeaders = columns.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
-    const headers = [...standardHeaders, ...financialHeaders];
+    // Aligned template structure with CSV reader expectations
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Public Holiday'];
+    
+    // Only add purely financial custom columns
+    const financialHeaders = columns
+        .filter(c => c.key !== 'basic' && c.key !== 'overtime' && c.key !== 'bonus')
+        .map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
+
+    const headers = [...standardHeaders, 'Basic Salary', 'Bonus', ...financialHeaders];
     
     // Example Data
-    const row = ['John Doe', 'john.doe@konecta.com', 'Vodafone', 'CSR', 'EG1234', 'CIB', 'EG1234567890123456789012', 'EGP', payrollSettings.daysPerMonth, '2', '5', '8', ...columns.map(()=>'0')];
+    const row = ['John Doe', 'john.doe@konecta.com', 'Vodafone', 'CSR', 'EG1234', 'CIB', 'EG1234567890123456789012', 'EGP', payrollSettings.daysPerMonth, '2', '5', '8', '5000', '500', ...financialHeaders.map(()=>'0')];
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), row.join(',')].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -957,9 +984,14 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const handleExportCSV = () => {
     if (employees.length === 0) return;
+    // Align export with template structure for consistency
     const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Public Holiday'];
-    const financialHeaders = columns.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
-    const headers = [...standardHeaders, ...financialHeaders, 'Net Pay'];
+    
+    // Filter out basic, overtime, bonus from dynamic list as they are handled explicitly or standard
+    const financialCols = columns.filter(c => c.key !== 'basic' && c.key !== 'overtime' && c.key !== 'bonus');
+    const financialHeaders = financialCols.map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
+    
+    const headers = [...standardHeaders, 'Basic Salary', 'Bonus', ...financialHeaders, 'Net Pay'];
 
     const csvRows = employees.map(emp => {
       const net = calculateNet(emp);
@@ -968,7 +1000,9 @@ const AdminDashboard = ({ user, onLogout }) => {
         esc(emp.name), esc(emp.email), esc(emp.project || 'General'), esc(emp.role || ''),
         esc(emp.id), esc(emp.bank_name || ''), esc(emp.iban || ''), esc(emp.currency || 'EGP'),
         esc(emp.worked_days || 0), esc(emp.ot_135 || 0), esc(emp.ot_17 || 0), esc(emp.ph_hours || 0),
-        ...columns.map(c => emp[c.key] || 0), net
+        esc(emp.basic || 0), esc(emp.bonus || 0),
+        ...financialCols.map(c => emp[c.key] || 0), 
+        net
       ];
       return row.join(',');
     });
@@ -1483,7 +1517,7 @@ const AdminDashboard = ({ user, onLogout }) => {
             employee={employees.find(e => e.id === previewId)} 
             columns={columns} 
             period={payrollPeriod} 
-            standardDays={30} 
+            standardDays={standardDays} 
             onClose={() => setPreviewId(null)}
          />
       )}
