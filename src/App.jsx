@@ -1198,7 +1198,7 @@ export default function App() {
         <div><h2 className="text-2xl font-bold text-slate-800">Employee Database</h2><p className="text-slate-500">Master record of all employees.</p></div>
         <div className="flex gap-2">
            <Button variant="secondary" onClick={() => {localStorage.removeItem('konecta_employee_db'); setMasterDB([]); showNotification('DB Cleared');}} icon={Trash2}>Clear DB</Button>
-           <Button variant="primary" icon={Save} onClick={() => saveMasterDB(masterDB)}>Save Changes</Button>
+           <Button variant="primary" icon={Save} onClick={saveToMasterDB}>Save Changes</Button>
         </div>
       </div>
       <Card className="flex-1 overflow-auto">
