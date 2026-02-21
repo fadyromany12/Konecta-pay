@@ -1,3 +1,5 @@
+import { db } from './firebase';
+import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileText, Send, Users, CheckCircle, AlertCircle, 
@@ -469,24 +471,35 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState([]);
 
   useEffect(() => {
+    // Keep Settings & Email configs in localStorage (they are specific to the user's browser)
     const savedConfig = localStorage.getItem('konecta_email_config');
     if (savedConfig) setEmailConfig(JSON.parse(savedConfig));
-
     const savedMsg = localStorage.getItem('konecta_email_message');
     if (savedMsg) setEmailMessage(savedMsg);
-    
-    // Load Payroll Settings
     const savedPayrollSettings = localStorage.getItem('konecta_payroll_settings');
     if (savedPayrollSettings) setPayrollSettings(JSON.parse(savedPayrollSettings));
 
-    const savedHistory = localStorage.getItem('konecta_payroll_history');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    // Load Data from Firebase Firestore
+    const loadFirebaseData = async () => {
+      try {
+        // Load Master DB
+        const dbSnap = await getDocs(collection(db, 'employees'));
+        setMasterDB(dbSnap.docs.map(d => d.data()));
 
-    const savedDB = localStorage.getItem('konecta_employee_db');
-    if (savedDB) setMasterDB(JSON.parse(savedDB));
+        // Load History (Sort newest first)
+        const histSnap = await getDocs(collection(db, 'history'));
+        setHistory(histSnap.docs.map(d => d.data()).sort((a,b) => b.id - a.id));
 
-    const savedLogs = localStorage.getItem('konecta_audit_logs');
-    if (savedLogs) setAuditLogs(JSON.parse(savedLogs));
+        // Load Audit Logs (Sort newest first)
+        const logsSnap = await getDocs(collection(db, 'auditLogs'));
+        setAuditLogs(logsSnap.docs.map(d => d.data()).sort((a,b) => b.id - a.id));
+      } catch (error) {
+        console.error("Error loading Firebase data:", error);
+        // Fallback to empty if offline or failing
+      }
+    };
+
+    loadFirebaseData();
   }, []);
 
   const saveEmailConfig = () => {
@@ -502,21 +515,25 @@ export default function App() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const logAction = (action, details) => {
+  const logAction = async (action, details) => {
     const newLog = {
       id: Date.now(),
       timestamp: new Date().toLocaleString(),
-      user: 'Admin', // In real app, this would be logged in user
+      user: 'Admin', 
       action,
       details
     };
-    const updatedLogs = [newLog, ...auditLogs];
-    setAuditLogs(updatedLogs);
-    localStorage.setItem('konecta_audit_logs', JSON.stringify(updatedLogs));
+    try {
+      // Save to Firebase
+      await setDoc(doc(db, 'auditLogs', String(newLog.id)), newLog);
+      // Update UI state
+      setAuditLogs(prev => [newLog, ...prev]);
+    } catch (error) {
+      console.error("Error logging action to Firebase:", error);
+    }
   };
 
-  // --- Persistence Helpers ---
-  const saveToHistory = (currentBatch) => {
+  const saveToHistory = async (currentBatch) => {
     const totalAmount = currentBatch.reduce((sum, emp) => sum + calculateNet(emp), 0);
     const newEntry = {
       id: Date.now(),
@@ -528,32 +545,49 @@ export default function App() {
       status: 'Completed',
       employees: currentBatch
     };
-    const updatedHistory = [newEntry, ...history];
-    setHistory(updatedHistory);
-    localStorage.setItem('konecta_payroll_history', JSON.stringify(updatedHistory));
-    logAction('Payroll Run', `Sent payslips to ${currentBatch.length} employees`);
+    try {
+      // Save to Firebase
+      await setDoc(doc(db, 'history', String(newEntry.id)), newEntry);
+      // Update UI state
+      setHistory(prev => [newEntry, ...prev]);
+      logAction('Payroll Run', `Sent payslips to ${currentBatch.length} employees`);
+    } catch (error) {
+      console.error("Error saving history to Firebase:", error);
+    }
   };
 
-  const saveToMasterDB = () => {
-    const newDB = [...masterDB];
-    let addedCount = 0;
-    let updatedCount = 0;
+  const saveToMasterDB = async () => {
+    try {
+      const batch = writeBatch(db);
+      const newDB = [...masterDB];
+      let addedCount = 0;
+      let updatedCount = 0;
 
-    employees.forEach(emp => {
-      const index = newDB.findIndex(dbEmp => dbEmp.id === emp.id);
-      if (index >= 0) {
-        newDB[index] = emp;
-        updatedCount++;
-      } else {
-        newDB.push(emp);
-        addedCount++;
-      }
-    });
+      employees.forEach(emp => {
+        // Prepare batch write for Firebase
+        const empRef = doc(db, 'employees', String(emp.id));
+        batch.set(empRef, emp); // Upserts the employee
 
-    setMasterDB(newDB);
-    localStorage.setItem('konecta_employee_db', JSON.stringify(newDB));
-    showNotification(`Database updated: ${addedCount} added, ${updatedCount} updated.`);
-    logAction('Database Update', `Updated ${updatedCount}, Added ${addedCount} records`);
+        // Update local state arrays
+        const index = newDB.findIndex(dbEmp => dbEmp.id === emp.id);
+        if (index >= 0) {
+          newDB[index] = emp;
+          updatedCount++;
+        } else {
+          newDB.push(emp);
+          addedCount++;
+        }
+      });
+
+      // Commit the batch to Firebase
+      await batch.commit();
+      setMasterDB(newDB);
+      showNotification(`Database updated in Cloud: ${addedCount} added, ${updatedCount} updated.`);
+      logAction('Database Update', `Updated ${updatedCount}, Added ${addedCount} records`);
+    } catch (error) {
+      console.error("Error saving DB to Firebase:", error);
+      showNotification('Failed to save to cloud database', 'error');
+    }
   };
 
   // --- Logic Implementations ---
@@ -593,7 +627,7 @@ export default function App() {
     showNotification(`Added ${label} (${type})`);
   };
 
-  // --- NEW: Smart CSV Import (Updated) ---
+// --- NEW: Smart CSV/TSV Import ---
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -616,6 +650,9 @@ export default function App() {
              return;
         }
 
+        // Auto-detect separator: supports both Excel copy-paste (Tabs) and standard CSVs (Commas)
+        const separator = lines[headerIndex].includes('\t') ? '\t' : ',';
+
         const parseLine = (line) => {
             const res = [];
             let current = '';
@@ -623,7 +660,7 @@ export default function App() {
             for (let i = 0; i < line.length; i++) {
                 const c = line[i];
                 if (c === '"') { inQuote = !inQuote; continue; }
-                if (c === ',' && !inQuote) { res.push(current.trim()); current = ''; }
+                if (c === separator && !inQuote) { res.push(current.trim()); current = ''; }
                 else { current += c; }
             }
             res.push(current.trim());
@@ -632,7 +669,7 @@ export default function App() {
 
         const headers = parseLine(lines[headerIndex]);
         
-        // Map headers
+        // Map standard text/info headers
         const standardMap = {
             'name': 'name', 'employee': 'name', 
             'email': 'email', 'e-mail': 'email',
@@ -651,15 +688,17 @@ export default function App() {
         const newEmployees = [];
         const newColumns = [...columns]; 
 
-        // Analyze headers
+        // Smart Analysis of Headers
         const columnMap = headers.map((h, idx) => {
             const lower = h.toLowerCase().replace(/['"]/g, '').trim();
+            if (!lower) return null;
             
             if (standardMap[lower]) return { type: 'standard', key: standardMap[lower] };
 
             let type = 'entitlement';
             let label = h.replace(/['"]/g, '').trim();
             
+            // Detect dynamic (Ded) or (Ent) columns
             if (lower.startsWith('(ded)') || lower.startsWith('deduction') || lower.startsWith('-')) {
                 type = 'deduction';
                 label = label.replace(/^(\(Ded\)|\(ded\)|Deduction:|Deduction|-) ?/i, '');
@@ -671,7 +710,13 @@ export default function App() {
                 if (existing) return { type: 'financial', key: existing.key };
             }
 
-            const key = label.toLowerCase().replace(/\s+/g, '_');
+            // Bind your custom template columns to the app's internal calculation keys
+            let key = label.toLowerCase().replace(/\s+/g, '_');
+            if (key === 'basic_salary') key = 'basic';
+            if (key === 'overtime_value') key = 'overtime';
+            if (key === 'social_insurance') key = 'social_ins';
+
+            // Add dynamic column if it doesn't exist
             if (!newColumns.find(c => c.key === key)) {
                 newColumns.push({ key, label, type });
             }
@@ -712,22 +757,25 @@ export default function App() {
                 }
             });
 
-            // Initialize base values and Calc OT
+            // Initialize base values for Proration Tool
             const ratio = (emp.worked_days > 0 && standardDays > 0) ? (emp.worked_days / standardDays) : 1;
-            
             emp.base_values.basic = Math.round((emp.basic || 0) / ratio);
+            
             newColumns.filter(c => c.type === 'entitlement' && c.key !== 'overtime' && c.key !== 'bonus').forEach(col => {
                const val = emp[col.key] || 0;
                emp.base_values[col.key] = Math.round(val / ratio);
             });
 
-            const basic = emp.basic || 0;
-            const otVal = 
-                calculateOvertimeValue(basic, emp.ot_135 || 0, 1.35, currentDivisor) +
-                calculateOvertimeValue(basic, emp.ot_17 || 0, 1.7, currentDivisor) +
-                calculateOvertimeValue(basic, emp.ph_hours || 0, 2, currentDivisor);
-            
-            emp.overtime = otVal;
+            // Override OT if user explicitly provided a pre-calculated Overtime Value
+            if (emp.overtime === undefined || emp.overtime === 0) {
+              const basic = emp.basic || 0;
+              const otVal = 
+                  calculateOvertimeValue(basic, emp.ot_135 || 0, 1.35, currentDivisor) +
+                  calculateOvertimeValue(basic, emp.ot_17 || 0, 1.7, currentDivisor) +
+                  calculateOvertimeValue(basic, emp.ph_hours || 0, 2, currentDivisor);
+              
+              emp.overtime = otVal;
+            }
 
             if (!emp.name) emp.name = 'Unknown';
             newEmployees.push(emp);
@@ -744,20 +792,32 @@ export default function App() {
 
   // --- NEW: Smart Template Download ---
   const handleDownloadTemplate = () => {
-    const standardHeaders = ['Name', 'Email', 'Project', 'Title/Role', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35x', 'OT 1.7x', 'Public Holiday (2x)'];
+    // 1. Standard details
+    const standardHeaders = ['Name', 'Email', 'Project', 'Title', 'EGID', 'Bank Name', 'IBAN', 'Currency', 'Worked Days', 'OT 1.35', 'OT 1.7', 'Public Holiday'];
     
-    const exampleDeductions = ['(Ded) Medical Insurance', '(Ded) Social Security'];
-    const financialHeaders = [...columns.map(c => c.key !== 'overtime' ? `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}` : '').filter(Boolean), ...exampleDeductions];
-    
-    const uniqueHeaders = [...new Set(financialHeaders)];
-    const headerRow = [...standardHeaders, ...uniqueHeaders].join(',');
-    
-    // Example Data
-    const standardData = ['John Doe', 'john.doe@konecta.com', 'Vodafone UK', 'CSR', 'eg1234', 'CIB', 'EG1200000000001234567890', 'EGP', payrollSettings.daysPerMonth, '2', '5', '8'];
-    const financialData = uniqueHeaders.map(() => '0'); 
-    const dataRow = [...standardData, ...financialData].join(',');
+    // 2. Fixed core columns as you requested
+    const coreFinancials = [
+        '(Ent) Basic Salary', 
+        '(Ent) Overtime Value', 
+        '(Ent) Bonus', 
+        '(Ded) Social Insurance', 
+        '(Ded) Income Tax'
+    ];
 
-    const csvContent = "data:text/csv;charset=utf-8," + headerRow + "\n" + dataRow;
+    // 3. Any extra columns the user created dynamically in the app UI
+    const customFinancials = columns
+        .filter(c => !['basic', 'overtime', 'bonus', 'social_ins', 'income_tax'].includes(c.key))
+        .map(c => `${c.type === 'entitlement' ? '(Ent)' : '(Ded)'} ${c.label}`);
+    
+    const financialHeaders = [...coreFinancials, ...customFinancials];
+    const headerRow = [...standardHeaders, ...financialHeaders].join(',');
+    
+    // Test data from your prompt mapping to the specific headers
+    const row1 = ['Sarah Ahmed', 'sarah.ahmed@konecta.com', 'Vodafone UK', 'CSR', 'eg5441', 'CIB', 'EG1200000000001234567890', 'EGP', '30', '2', '0', '0', '4500', '265', '500', '579', '0', ...customFinancials.map(()=>'0')].join(',');
+    const row2 = ['Mohamed Ali', 'mohamed.ali@konecta.com', 'Orange Business', 'Team Leader', 'eg5442', 'QNB Alahli', 'EG9800000000009876543210', 'EGP', '30', '0', '8', '8', '7200', '1250', '1200', '1062', '530', ...customFinancials.map(()=>'0')].join(',');
+    const row3 = ['Layla Youssef', 'layla.youssef@konecta.com', 'Amazon DE', 'QA Specialist', 'eg5443', 'HSBC', 'EG5500000000005555555555', 'EGP', '30', '0', '0', '0', '5800', '105', '300', '683', '52', ...customFinancials.map(()=>'0')].join(',');
+
+    const csvContent = "data:text/csv;charset=utf-8," + headerRow + "\n" + row1 + "\n" + row2 + "\n" + row3;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
