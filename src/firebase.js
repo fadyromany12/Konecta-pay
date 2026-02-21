@@ -1,21 +1,17 @@
-// src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore"; // We add this to use the Database
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAqPwESS1hAcdEmkG0lsesgadeLDKgOQRw",
-  authDomain: "konectapay-43d60.firebaseapp.com",
-  projectId: "konectapay-43d60",
-  storageBucket: "konectapay-43d60.firebasestorage.app",
-  messagingSenderId: "291857733282",
-  appId: "1:291857733282:web:bb1b3a3cca387f562fe9fb",
-  measurementId: "G-VS6L9P0JKB"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const analytics = getAnalytics(app);
-
-// Initialize Cloud Firestore and export it so App.jsx can use it
 export const db = getFirestore(app);
