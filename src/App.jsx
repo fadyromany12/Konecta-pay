@@ -1,5 +1,6 @@
-import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { db, auth } from './firebase'; // Added auth here
+import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'; // New Auth functions
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileText, Send, Users, CheckCircle, AlertCircle, 
@@ -7,7 +8,8 @@ import {
   Settings, X, Eye, Calculator, FileDown, Plus, Trash2,
   Mail, Key, HelpCircle, UserPlus, FileUp, Save, Filter, CheckSquare,
   Database, Clock, RotateCcw, CreditCard, PieChart, Printer, ClipboardList,
-  MessageSquare, Phone, ArrowLeft, Briefcase, DollarSign, Building2, Scissors
+  MessageSquare, Phone, ArrowLeft, Briefcase, DollarSign, Building2, Scissors,
+  LogOut // NEW: Added LogOut icon
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
@@ -430,6 +432,12 @@ const PayslipPreview = ({ employee, columns, period, standardDays, onClose }) =>
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
+  // NEW: Authentication State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [view, setView] = useState('dashboard');
   const [employees, setEmployees] = useState([]);
   const [previewId, setPreviewId] = useState(null);
@@ -471,6 +479,11 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState([]);
 
   useEffect(() => {
+    // NEW: Listen for Authentication state changes
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false); // Stop showing the loading spinner
+    });
     // Keep Settings & Email configs in localStorage (they are specific to the user's browser)
     const savedConfig = localStorage.getItem('konecta_email_config');
     if (savedConfig) setEmailConfig(JSON.parse(savedConfig));
@@ -500,7 +513,29 @@ export default function App() {
     };
 
     loadFirebaseData();
+    return () => unsubscribe();
   }, []);
+
+
+ // --- AUTHENTICATION HANDLERS ---
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      // Success: onAuthStateChanged will automatically update the UI
+    } catch (error) {
+      setLoginError('Invalid admin email or password.');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  }; 
 
   const saveEmailConfig = () => {
     localStorage.setItem('konecta_email_config', JSON.stringify(emailConfig));
@@ -1282,6 +1317,74 @@ export default function App() {
     );
   };
 
+  // --- UI: Loading Screen ---
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // --- UI: Login Screen ---
+  if (!user) {
+    return (
+      <div className="h-screen w-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full border border-slate-200">
+          <div className="text-center mb-8">
+            <img 
+               src="https://i.ibb.co/zh1JWQLB/konecta-favicon.jpg" 
+               alt="Konecta Logo" 
+               className="h-16 mx-auto mb-4 rounded-xl shadow-sm" 
+            />
+            <h1 className="text-2xl font-bold text-slate-800">Admin Access</h1>
+            <p className="text-slate-500 text-sm mt-1">KonectaPay Secure Portal</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            {loginError && <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 font-medium">{loginError}</p>}
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="email" 
+                  value={loginEmail} 
+                  onChange={e => setLoginEmail(e.target.value)} 
+                  required 
+                  placeholder="admin@konecta.com"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" 
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Password</label>
+              <div className="relative">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="password" 
+                  value={loginPassword} 
+                  onChange={e => setLoginPassword(e.target.value)} 
+                  required 
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all" 
+                />
+              </div>
+            </div>
+            
+            <Button className="w-full py-3 mt-2 font-bold shadow-blue-200" type="submit">
+              Secure Login
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // (Your existing code continues here: if (view === 'print-batch')...)
+
   if (view === 'print-batch') return <BatchPrintView />;
 
   return (
@@ -1308,8 +1411,23 @@ export default function App() {
           <button onClick={() => setView('audit')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'audit' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}><ClipboardList size={20} /> Audit Logs</button>
           <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"><Settings size={20} /> Settings</button>
         </nav>
-        <div className="p-4 border-t border-slate-100"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden"><div className="w-full h-full bg-blue-900 text-white flex items-center justify-center">FM</div></div><div><p className="text-sm font-bold text-slate-800">Financial Mgr.</p><p className="text-xs text-slate-500">Konecta Egypt</p></div></div></div>
-      </aside>
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden">
+                <div className="w-full h-full bg-blue-900 text-white flex items-center justify-center font-bold">FM</div>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Financial Mgr.</p>
+                <p className="text-xs text-slate-500">Konecta Egypt</p>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Log Out">
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+         </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
